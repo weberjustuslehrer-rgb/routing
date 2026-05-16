@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Routing mit Kosten verstehen</title>
+<style>
+/* ============================================================
+   Routing mit Kosten verstehen – Single-File-HTML
+   Informatik · Klassenstufe 11 · Sachsen
+   Fokus: Zielnetz, Kosten, nächster Hop, scheinbarer Umweg
+   ============================================================ */
+
+:root {
+  --bg: #f6f3ff;
+  --bg2: #edf6ff;
+  --surface: #ffffff;
+  --surface2: #fbfcff;
+  --ink: #1d2433;
+  --muted: #697389;
+  --line: #d8deef;
+
+  --blue: #3764d8;
+  --blueSoft: #eaf0ff;
+  --violet: #7757d9;
+  --violetSoft: #f0ecff;
+  --green: #17855b;
+  --greenSoft: #eaf8f2;
+  --orange: #d66a1f;
+  --orangeSoft: #fff0e5;
+  --red: #c83f49;
+  --redSoft: #ffecef;
+  --graySoft: #f3f5fb;
+
+  --shadow: 0 18px 42px rgba(54, 64, 105, .14);
+  --radius: 22px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 12% 10%, rgba(119,87,217,.18), transparent 32%),
+    radial-gradient(circle at 90% 20%, rgba(55,100,216,.17), transparent 35%),
+    linear-gradient(135deg, var(--bg), var(--bg2));
+}
+
+button, select { font: inherit; }
+
+.app {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 26px 0 36px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.25fr .85fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.panel {
+  background: rgba(255,255,255,.88);
+  border: 1px solid rgba(216,222,239,.92);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.titlePanel {
+  padding: 24px 26px;
+  position: relative;
+  overflow: hidden;
+}
+
+.titlePanel::after {
+  content: "";
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  border-radius: 999px;
+  right: -90px;
+  top: -100px;
+  background: linear-gradient(135deg, rgba(119,87,217,.16), rgba(55,100,216,.10));
+}
+
+.kicker {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: var(--violet);
+  background: var(--violetSoft);
+  font-weight: 800;
+  font-size: .86rem;
+  margin-bottom: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+  max-width: 780px;
+}
+
+.subtitle {
+  margin: 13px 0 0;
+  color: var(--muted);
+  font-size: 1.03rem;
+  max-width: 740px;
+  line-height: 1.5;
+}
+
+.focusPanel {
+  padding: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.focusBox {
+  border-radius: 18px;
+  padding: 14px 15px;
+  background: linear-gradient(135deg, var(--blueSoft), var(--violetSoft));
+  border: 1px solid rgba(55,100,216,.17);
+}
+
+.focusBox strong { display: block; margin-bottom: 5px; }
+.focusBox p { margin: 0; color: var(--muted); line-height: 1.42; }
+
+.keywords {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.keyword {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 9px 10px;
+  background: var(--surface2);
+  font-size: .9rem;
+}
+
+.keyword span {
+  display: block;
+  color: var(--muted);
+  font-size: .78rem;
+  margin-top: 2px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1.35fr .85fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.networkPanel { padding: 17px; }
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.stageTitle { display: grid; gap: 2px; }
+.stageTitle strong { font-size: 1.08rem; }
+.stageTitle span { color: var(--muted); font-size: .92rem; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.selectWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: .92rem;
+}
+
+select {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 750;
+  outline: none;
+}
+
+.btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: var(--ink);
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(29,36,51,.14);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.btn:hover { transform: translateY(-1px); box-shadow: 0 14px 28px rgba(29,36,51,.18); }
+.btn:active { transform: translateY(0); }
+.btn.secondary { background: var(--blue); }
+.btn.light { background: #fff; color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+.btn.ghost { background: transparent; color: var(--blue); box-shadow: none; border: 1px solid rgba(55,100,216,.25); }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+.svgWrap {
+  width: 100%;
+  height: 500px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, rgba(216,222,239,.38) 1px, transparent 1px),
+    linear-gradient(rgba(216,222,239,.38) 1px, transparent 1px),
+    linear-gradient(135deg, #fff, #fbfcff);
+  background-size: 42px 42px, 42px 42px, 100% 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+svg { width: 100%; height: 100%; display: block; }
+
+.link {
+  stroke: #b8c1dc;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.link.active {
+  stroke: var(--violet);
+  stroke-width: 8;
+  filter: drop-shadow(0 0 8px rgba(119,87,217,.34));
+}
+
+.link.nextHint {
+  stroke: var(--orange);
+  stroke-dasharray: 9 10;
+  animation: dash 1.1s linear infinite;
+}
+
+.link.rejected {
+  stroke: var(--red);
+  stroke-width: 6;
+  stroke-dasharray: 4 10;
+  opacity: .75;
+}
+
+@keyframes dash { to { stroke-dashoffset: -38; } }
+
+.costBubble {
+  fill: #fff;
+  stroke: var(--line);
+  stroke-width: 2;
+  filter: drop-shadow(0 8px 10px rgba(40,50,80,.10));
+}
+
+.costText {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.costGroup.active .costBubble { fill: var(--violetSoft); stroke: rgba(119,87,217,.45); }
+.costGroup.active .costText { fill: var(--violet); }
+.costGroup.next .costBubble { fill: var(--orangeSoft); stroke: rgba(214,106,31,.55); }
+.costGroup.next .costText { fill: var(--orange); }
+.costGroup.rejected .costBubble { fill: var(--redSoft); stroke: rgba(200,63,73,.55); }
+.costGroup.rejected .costText { fill: var(--red); }
+
+.node circle.main {
+  stroke: #fff;
+  stroke-width: 5;
+  filter: drop-shadow(0 12px 14px rgba(40,50,80,.16));
+}
+
+.node.host circle.main { fill: var(--green); }
+.node.router circle.main { fill: var(--blue); }
+.node.target circle.main { fill: var(--orange); }
+.node.current circle.main {
+  stroke: var(--orange);
+  stroke-width: 7;
+}
+
+.node text.label {
+  fill: var(--ink);
+  font-weight: 900;
+  font-size: 16px;
+  text-anchor: middle;
+}
+
+.node text.sub {
+  fill: var(--muted);
+  font-weight: 650;
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.packet {
+  filter: drop-shadow(0 10px 14px rgba(214,106,31,.32));
+  transition: transform .8s cubic-bezier(.2,.8,.2,1);
+}
+
+.packetLabel {
+  font-size: 12px;
+  fill: #fff;
+  font-weight: 900;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.noteLabel {
+  fill: var(--red);
+  font-size: 12px;
+  font-weight: 850;
+  text-anchor: middle;
+}
+
+.infoStrip {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.infoCard {
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  padding: 12px 13px;
+  background: rgba(255,255,255,.92);
+}
+
+.infoCard span {
+  display: block;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 750;
+  margin-bottom: 4px;
+}
+
+.infoCard strong { font-size: .98rem; }
+.infoCard p { margin: 4px 0 0; color: var(--muted); line-height: 1.34; font-size: .9rem; }
+
+.sidePanel { display: grid; gap: 16px; }
+.card { padding: 17px; }
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 1.24rem;
+  letter-spacing: -.02em;
+}
+
+.stepBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  background: var(--orangeSoft);
+  color: var(--orange);
+  border-radius: 999px;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.explain { color: var(--muted); line-height: 1.48; margin: 0; }
+
+.compareBox {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.compareRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface2);
+  padding: 10px;
+  font-size: .9rem;
+}
+
+.compareRow.chosen {
+  background: var(--greenSoft);
+  border-color: rgba(23,133,91,.22);
+}
+
+.compareRow.rejectedChoice {
+  background: var(--redSoft);
+  border-color: rgba(200,63,73,.22);
+}
+
+.compareRow strong { display: block; }
+.compareRow span { color: var(--muted); font-size: .82rem; }
+
+.routingTable {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 16px;
+  font-size: .9rem;
+  margin-top: 12px;
+}
+
+.routingTable th {
+  text-align: left;
+  color: var(--muted);
+  font-size: .76rem;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  background: var(--surface2);
+  padding: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.routingTable td {
+  padding: 9px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.routingTable tr:last-child td { border-bottom: 0; }
+.routingTable tr.match td {
+  background: var(--orangeSoft);
+  font-weight: 850;
+  color: #793b0d;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--blueSoft);
+  color: var(--blue);
+  font-weight: 850;
+  font-size: .8rem;
+}
+
+.pill.green { background: var(--greenSoft); color: var(--green); }
+.pill.violet { background: var(--violetSoft); color: var(--violet); }
+.pill.orange { background: var(--orangeSoft); color: var(--orange); }
+.pill.red { background: var(--redSoft); color: var(--red); }
+
+.ruleGrid { display: grid; gap: 9px; }
+.rule {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  padding: 11px;
+}
+.rule strong { display: block; margin-bottom: 4px; }
+.rule p { margin: 0; color: var(--muted); line-height: 1.38; }
+
+.workBox {
+  margin-top: 10px;
+  border-radius: 16px;
+  padding: 12px;
+  border: 1px solid rgba(23,133,91,.20);
+  background: var(--greenSoft);
+  color: #174f3a;
+  line-height: 1.42;
+}
+
+.workBox strong { color: var(--green); }
+
+.log {
+  display: grid;
+  gap: 8px;
+  max-height: 210px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.logItem {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 9px;
+  align-items: start;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+}
+
+.logNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--violetSoft);
+  color: var(--violet);
+  font-weight: 900;
+}
+
+.logItem strong { display: block; margin-bottom: 3px; }
+.logItem span { color: var(--muted); line-height: 1.35; font-size: .9rem; }
+
+@media (max-width: 980px) {
+  .hero, .layout { grid-template-columns: 1fr; }
+  .svgWrap { height: 440px; }
+}
+
+@media (max-width: 660px) {
+  .app { width: min(100vw - 18px, 1180px); padding-top: 10px; }
+  .titlePanel, .focusPanel, .card, .networkPanel { padding: 14px; }
+  .keywords, .infoStrip { grid-template-columns: 1fr; }
+  .svgWrap { height: 390px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hero">
+    <section class="panel titlePanel">
+      <div class="kicker">🔀 Rechnernetze · Routing</div>
+      <h1>Routing: nicht immer der direkte Weg</h1>
+      <p class="subtitle">
+        Ein Paket trägt eine Zieladresse. Jeder Router vergleicht das Zielnetz mit seiner Routingtabelle und wählt den nächsten Hop mit den geringeren Gesamtkosten.
+      </p>
+    </section>
+
+    <aside class="panel focusPanel">
+      <div class="focusBox">
+        <strong>Kernidee</strong>
+        <p>Ein optisch kurzer Weg kann ungünstig sein. Routing bewertet Wege mit Kosten: niedrigere Kosten bedeuten den bevorzugten Weg.</p>
+      </div>
+      <div class="keywords">
+        <div class="keyword">Zielnetz<span>Wohin soll das Paket?</span></div>
+        <div class="keyword">Kosten<span>Wie teuer ist der Weg?</span></div>
+        <div class="keyword">Nächster Hop<span>Welche Station jetzt?</span></div>
+      </div>
+    </aside>
+  </header>
+
+  <main class="layout">
+    <section class="panel networkPanel">
+      <div class="topbar">
+        <div class="stageTitle">
+          <strong>Schrittweise Weiterleitung</strong>
+          <span>Die roten gestrichelten Strecken wirken teilweise naheliegend, haben aber höhere Kosten.</span>
+        </div>
+        <div class="controls">
+          <label class="selectWrap">Ziel
+            <select id="targetSelect">
+              <option value="server">Server · 10.0.4.20</option>
+              <option value="printer">Drucker · 10.0.5.30</option>
+              <option value="tablet">Tablet · 10.0.3.12</option>
+            </select>
+          </label>
+          <button class="btn secondary" id="stepBtn">Nächster Schritt</button>
+          <button class="btn light" id="autoBtn">Automatisch</button>
+          <button class="btn ghost" id="resetBtn">Zurücksetzen</button>
+        </div>
+      </div>
+
+      <div class="svgWrap" aria-label="Netzwerkdiagramm mit Kosten, Umwegen und Routing-Animation">
+        <svg viewBox="0 0 900 520" role="img">
+          <!-- Links -->
+          <line id="link-pc-r1" class="link" x1="105" y1="270" x2="255" y2="270" />
+          <line id="link-r1-r2" class="link" x1="255" y1="270" x2="430" y2="150" />
+          <line id="link-r1-r3" class="link" x1="255" y1="270" x2="430" y2="390" />
+          <line id="link-r2-r4" class="link" x1="430" y1="150" x2="610" y2="170" />
+          <line id="link-r3-r4" class="link" x1="430" y1="390" x2="610" y2="170" />
+          <line id="link-r2-server" class="link" x1="430" y1="150" x2="790" y2="105" />
+          <line id="link-r4-server" class="link" x1="610" y1="170" x2="790" y2="105" />
+          <line id="link-r4-printer" class="link" x1="610" y1="170" x2="800" y2="280" />
+          <line id="link-r3-tablet" class="link" x1="430" y1="390" x2="655" y2="420" />
+          <line id="link-r1-tablet" class="link" x1="255" y1="270" x2="655" y2="420" />
+
+          <!-- Kosten -->
+          <g id="cost-pc-r1" class="costGroup" transform="translate(180 250)">
+            <circle class="costBubble" r="17"></circle><text class="costText">1</text>
+          </g>
+          <g id="cost-r1-r2" class="costGroup" transform="translate(335 195)">
+            <circle class="costBubble" r="17"></circle><text class="costText">2</text>
+          </g>
+          <g id="cost-r1-r3" class="costGroup" transform="translate(335 345)">
+            <circle class="costBubble" r="17"></circle><text class="costText">1</text>
+          </g>
+          <g id="cost-r2-r4" class="costGroup" transform="translate(520 135)">
+            <circle class="costBubble" r="17"></circle><text class="costText">2</text>
+          </g>
+          <g id="cost-r3-r4" class="costGroup" transform="translate(515 285)">
+            <circle class="costBubble" r="17"></circle><text class="costText">1</text>
+          </g>
+          <g id="cost-r2-server" class="costGroup" transform="translate(610 108)">
+            <circle class="costBubble" r="17"></circle><text class="costText">8</text>
+          </g>
+          <g id="cost-r4-server" class="costGroup" transform="translate(700 118)">
+            <circle class="costBubble" r="17"></circle><text class="costText">1</text>
+          </g>
+          <g id="cost-r4-printer" class="costGroup" transform="translate(705 235)">
+            <circle class="costBubble" r="17"></circle><text class="costText">1</text>
+          </g>
+          <g id="cost-r3-tablet" class="costGroup" transform="translate(545 425)">
+            <circle class="costBubble" r="17"></circle><text class="costText">1</text>
+          </g>
+          <g id="cost-r1-tablet" class="costGroup" transform="translate(455 310)">
+            <circle class="costBubble" r="17"></circle><text class="costText">7</text>
+          </g>
+
+          <text class="noteLabel" x="610" y="83">direkt, aber teuer</text>
+          <text class="noteLabel" x="455" y="288">direkt, aber teuer</text>
+
+          <!-- Nodes -->
+          <g id="node-pc" class="node host" transform="translate(105 270)">
+            <circle class="main" r="38"></circle>
+            <text class="label" y="5">PC A</text>
+            <text class="sub" y="58">10.0.1.10</text>
+          </g>
+
+          <g id="node-r1" class="node router" transform="translate(255 270)">
+            <circle class="main" r="40"></circle>
+            <text class="label" y="5">R1</text>
+            <text class="sub" y="60">Start</text>
+          </g>
+
+          <g id="node-r2" class="node router" transform="translate(430 150)">
+            <circle class="main" r="40"></circle>
+            <text class="label" y="5">R2</text>
+            <text class="sub" y="60">oben</text>
+          </g>
+
+          <g id="node-r3" class="node router" transform="translate(430 390)">
+            <circle class="main" r="40"></circle>
+            <text class="label" y="5">R3</text>
+            <text class="sub" y="60">unten</text>
+          </g>
+
+          <g id="node-r4" class="node router" transform="translate(610 170)">
+            <circle class="main" r="40"></circle>
+            <text class="label" y="5">R4</text>
+            <text class="sub" y="60">Verteiler</text>
+          </g>
+
+          <g id="node-server" class="node host" transform="translate(790 105)">
+            <circle class="main" r="38"></circle>
+            <text class="label" y="5">Server</text>
+            <text class="sub" y="58">10.0.4.20</text>
+          </g>
+
+          <g id="node-printer" class="node host" transform="translate(800 280)">
+            <circle class="main" r="38"></circle>
+            <text class="label" y="5">Drucker</text>
+            <text class="sub" y="58">10.0.5.30</text>
+          </g>
+
+          <g id="node-tablet" class="node host" transform="translate(655 420)">
+            <circle class="main" r="38"></circle>
+            <text class="label" y="5">Tablet</text>
+            <text class="sub" y="58">10.0.3.12</text>
+          </g>
+
+          <!-- Packet -->
+          <g id="packet" class="packet" transform="translate(105 270)">
+            <rect x="-34" y="-22" width="68" height="44" rx="13" fill="#d66a1f"></rect>
+            <path d="M-34 -8 L0 8 L34 -8" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".9"></path>
+            <text class="packetLabel" y="7">Paket</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="infoStrip">
+        <div class="infoCard">
+          <span>Zieladresse</span>
+          <strong id="targetInfo">10.0.4.20</strong>
+          <p>Sie bleibt während der Weiterleitung gleich.</p>
+        </div>
+        <div class="infoCard">
+          <span>Aktuelle Station</span>
+          <strong id="currentInfo">PC A</strong>
+          <p>Nur diese Station trifft jetzt eine Entscheidung.</p>
+        </div>
+        <div class="infoCard">
+          <span>Nächster Hop</span>
+          <strong id="nextInfo">R1</strong>
+          <p>Das ist die nächste Station auf dem gewählten Weg.</p>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidePanel">
+      <section class="panel card">
+        <div class="stepBadge" id="badge">Schritt 0</div>
+        <h2>Entscheidung an dieser Station</h2>
+        <p class="explain" id="decisionText">
+          PC A prüft: Das Ziel liegt nicht im eigenen Netz. Deshalb geht das Paket an das Standardgateway R1.
+        </p>
+        <div class="compareBox" id="compareBox"></div>
+        <table class="routingTable" aria-label="Routingtabelle des aktuellen Routers">
+          <thead>
+            <tr>
+              <th>Zielnetz</th>
+              <th>Nächster Hop</th>
+              <th>Kosten</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </section>
+
+      <section class="panel card">
+        <h2>Was man sich merken soll</h2>
+        <div class="ruleGrid">
+          <div class="rule">
+            <strong>1. Kosten statt Luftlinie</strong>
+            <p>Ein direkter Link kann teuer sein. Dann ist ein Umweg mit geringeren Gesamtkosten besser.</p>
+          </div>
+          <div class="rule">
+            <strong>2. Routingtabelle als Entscheidungshilfe</strong>
+            <p>Der Router nutzt Zielnetz, nächsten Hop und Kosten. Er muss den Weg nicht erraten.</p>
+          </div>
+          <div class="rule">
+            <strong>3. Hop für Hop</strong>
+            <p>Jede Station wählt den nächsten Hop. Die Zieladresse im Paket bleibt dabei gleich.</p>
+          </div>
+        </div>
+        <div class="workBox">
+          <strong>Arbeitsauftrag:</strong> Vergleiche beim Server und beim Tablet den direkten Weg mit dem gewählten Weg. Begründe mit Kosten.
+        </div>
+      </section>
+
+      <section class="panel card">
+        <h2>Paketweg</h2>
+        <div class="log" id="log"></div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   Datenmodell
+   ============================================================ */
+
+const nodes = {
+  pc:      { x: 105, y: 270, label: "PC A" },
+  r1:      { x: 255, y: 270, label: "R1" },
+  r2:      { x: 430, y: 150, label: "R2" },
+  r3:      { x: 430, y: 390, label: "R3" },
+  r4:      { x: 610, y: 170, label: "R4" },
+  server:  { x: 790, y: 105, label: "Server" },
+  printer: { x: 800, y: 280, label: "Drucker" },
+  tablet:  { x: 655, y: 420, label: "Tablet" }
+};
+
+const links = {
+  "pc-r1": ["pc", "r1"],
+  "r1-r2": ["r1", "r2"],
+  "r1-r3": ["r1", "r3"],
+  "r2-r4": ["r2", "r4"],
+  "r3-r4": ["r3", "r4"],
+  "r2-server": ["r2", "server"],
+  "r4-server": ["r4", "server"],
+  "r4-printer": ["r4", "printer"],
+  "r3-tablet": ["r3", "tablet"],
+  "r1-tablet": ["r1", "tablet"]
+};
+
+const linkCosts = {
+  "pc-r1": 1,
+  "r1-r2": 2,
+  "r1-r3": 1,
+  "r2-r4": 2,
+  "r3-r4": 1,
+  "r2-server": 8,
+  "r4-server": 1,
+  "r4-printer": 1,
+  "r3-tablet": 1,
+  "r1-tablet": 7
+};
+
+const targets = {
+  server: {
+    name: "Server",
+    address: "10.0.4.20",
+    network: "10.0.4.0/24",
+    path: ["pc", "r1", "r2", "r4", "server"],
+    alternatives: [
+      { label: "direkter Weg ab R2", path: ["r2", "server"], cost: 8, rejectedLinks: [["r2", "server"]] },
+      { label: "Umweg ab R2 über R4", path: ["r2", "r4", "server"], cost: 3, chosen: true }
+    ]
+  },
+  printer: {
+    name: "Drucker",
+    address: "10.0.5.30",
+    network: "10.0.5.0/24",
+    path: ["pc", "r1", "r3", "r4", "printer"],
+    alternatives: [
+      { label: "oberer Weg ab R1", path: ["r1", "r2", "r4", "printer"], cost: 5 },
+      { label: "unterer Weg ab R1", path: ["r1", "r3", "r4", "printer"], cost: 3, chosen: true }
+    ]
+  },
+  tablet: {
+    name: "Tablet",
+    address: "10.0.3.12",
+    network: "10.0.3.0/24",
+    path: ["pc", "r1", "r3", "tablet"],
+    alternatives: [
+      { label: "direkter Weg ab R1", path: ["r1", "tablet"], cost: 7, rejectedLinks: [["r1", "tablet"]] },
+      { label: "Umweg ab R1 über R3", path: ["r1", "r3", "tablet"], cost: 2, chosen: true }
+    ]
+  }
+};
+
+const routingTables = {
+  pc: [
+    { network: "nicht lokales Netz", hop: "R1", cost: 1 }
+  ],
+  r1: [
+    { network: "10.0.3.0/24", hop: "R3", cost: 2, note: "statt direkt zum Tablet" },
+    { network: "10.0.4.0/24", hop: "R2", cost: 5 },
+    { network: "10.0.5.0/24", hop: "R3", cost: 3, note: "unterer Weg günstiger" }
+  ],
+  r2: [
+    { network: "10.0.4.0/24", hop: "R4", cost: 3, note: "statt direkt zum Server" },
+    { network: "10.0.5.0/24", hop: "R4", cost: 3 },
+    { network: "10.0.3.0/24", hop: "R1", cost: 4 }
+  ],
+  r3: [
+    { network: "10.0.3.0/24", hop: "direkt", cost: 1 },
+    { network: "10.0.4.0/24", hop: "R4", cost: 2 },
+    { network: "10.0.5.0/24", hop: "R4", cost: 2 }
+  ],
+  r4: [
+    { network: "10.0.4.0/24", hop: "direkt", cost: 1 },
+    { network: "10.0.5.0/24", hop: "direkt", cost: 1 },
+    { network: "10.0.3.0/24", hop: "R3", cost: 2 }
+  ],
+  server: [],
+  printer: [],
+  tablet: []
+};
+
+let targetKey = "server";
+let stepIndex = 0;
+let autoTimer = null;
+
+const el = {
+  targetSelect: document.getElementById("targetSelect"),
+  stepBtn: document.getElementById("stepBtn"),
+  autoBtn: document.getElementById("autoBtn"),
+  resetBtn: document.getElementById("resetBtn"),
+  packet: document.getElementById("packet"),
+  badge: document.getElementById("badge"),
+  decisionText: document.getElementById("decisionText"),
+  compareBox: document.getElementById("compareBox"),
+  tableBody: document.getElementById("tableBody"),
+  targetInfo: document.getElementById("targetInfo"),
+  currentInfo: document.getElementById("currentInfo"),
+  nextInfo: document.getElementById("nextInfo"),
+  log: document.getElementById("log")
+};
+
+function pairKey(a, b) {
+  const direct = `${a}-${b}`;
+  const reverse = `${b}-${a}`;
+  if (links[direct]) return direct;
+  if (links[reverse]) return reverse;
+  return null;
+}
+
+function linkId(a, b) {
+  const key = pairKey(a, b);
+  return key ? `link-${key}` : null;
+}
+
+function costId(a, b) {
+  const key = pairKey(a, b);
+  return key ? `cost-${key}` : null;
+}
+
+function linkCost(a, b) {
+  const key = pairKey(a, b);
+  return key ? linkCosts[key] : 0;
+}
+
+function pathCost(path) {
+  let sum = 0;
+  for (let i = 0; i < path.length - 1; i++) sum += linkCost(path[i], path[i + 1]);
+  return sum;
+}
+
+function totalCostSoFar(path) {
+  let sum = 0;
+  for (let i = 0; i < stepIndex; i++) sum += linkCost(path[i], path[i + 1]);
+  return sum;
+}
+
+function setPacketPosition(nodeKey) {
+  const n = nodes[nodeKey];
+  el.packet.setAttribute("transform", `translate(${n.x} ${n.y})`);
+}
+
+function clearHighlights() {
+  document.querySelectorAll(".link").forEach(link => link.classList.remove("active", "nextHint", "rejected"));
+  document.querySelectorAll(".costGroup").forEach(cost => cost.classList.remove("active", "next", "rejected"));
+  document.querySelectorAll(".node").forEach(node => node.classList.remove("current", "target"));
+}
+
+function markRejectedLinks(target) {
+  const alternatives = target.alternatives || [];
+  alternatives.forEach(alt => {
+    if (!alt.rejectedLinks) return;
+    alt.rejectedLinks.forEach(([a, b]) => {
+      const rejectedLink = document.getElementById(linkId(a, b));
+      const rejectedCost = document.getElementById(costId(a, b));
+      if (rejectedLink) rejectedLink.classList.add("rejected");
+      if (rejectedCost) rejectedCost.classList.add("rejected");
+    });
+  });
+}
+
+function markPath(path) {
+  for (let i = 0; i < stepIndex; i++) {
+    const activeLink = document.getElementById(linkId(path[i], path[i + 1]));
+    const activeCost = document.getElementById(costId(path[i], path[i + 1]));
+    if (activeLink) activeLink.classList.add("active");
+    if (activeCost) activeCost.classList.add("active");
+  }
+
+  if (stepIndex < path.length - 1) {
+    const nextLink = document.getElementById(linkId(path[stepIndex], path[stepIndex + 1]));
+    const nextCost = document.getElementById(costId(path[stepIndex], path[stepIndex + 1]));
+    if (nextLink) nextLink.classList.add("nextHint");
+    if (nextCost) nextCost.classList.add("next");
+  }
+}
+
+function markNodes(current) {
+  const currentNode = document.getElementById(`node-${current}`);
+  const targetNode = document.getElementById(`node-${targetKey}`);
+  if (currentNode) currentNode.classList.add("current");
+  if (targetNode) targetNode.classList.add("target");
+}
+
+function nextHopLabel(current, next) {
+  if (!next) return "Ziel erreicht";
+  if (current === "pc") return "R1";
+  if (next === targetKey) return "direkt";
+  return nodes[next].label;
+}
+
+function updateCompareBox(target) {
+  const alternatives = target.alternatives || [];
+  el.compareBox.innerHTML = "";
+
+  if (alternatives.length === 0) return;
+
+  alternatives.forEach(alt => {
+    const row = document.createElement("div");
+    row.className = alt.chosen ? "compareRow chosen" : "compareRow rejectedChoice";
+    row.innerHTML = `
+      <div>
+        <strong>${alt.label}</strong>
+        <span>${alt.path.map(key => nodes[key].label).join(" → ")}</span>
+      </div>
+      <span class="pill ${alt.chosen ? "green" : "red"}">${alt.cost} Kosten</span>
+    `;
+    el.compareBox.appendChild(row);
+  });
+}
+
+function updateTable(current, target) {
+  const rows = routingTables[current] || [];
+  el.tableBody.innerHTML = "";
+
+  if (rows.length === 0) {
+    el.tableBody.innerHTML = `<tr><td colspan="3"><span class="pill green">Ziel erreicht</span></td></tr>`;
+    return;
+  }
+
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+    if (row.network === target.network || (current === "pc" && row.network === "nicht lokales Netz")) tr.classList.add("match");
+    const note = row.note ? `<br><span style="color:#697389;font-weight:650;font-size:.78rem;">${row.note}</span>` : "";
+    tr.innerHTML = `<td>${row.network}${note}</td><td>${row.hop}</td><td>${row.cost}</td>`;
+    el.tableBody.appendChild(tr);
+  });
+}
+
+function updateDecision(current, next, target, path) {
+  const currentName = nodes[current].label;
+  const nextName = next ? nodes[next].label : "kein weiterer Hop";
+
+  el.badge.textContent = `Schritt ${stepIndex}`;
+  el.targetInfo.textContent = `${target.address} · ${target.network}`;
+  el.currentInfo.textContent = currentName;
+  el.nextInfo.textContent = nextHopLabel(current, next);
+
+  if (stepIndex === 0) {
+    el.decisionText.textContent = `PC A erkennt: ${target.address} liegt nicht im eigenen Netz. Deshalb wird das Paket an das Standardgateway R1 übergeben.`;
+    return;
+  }
+
+  if (!next) {
+    el.decisionText.textContent = `${target.name} ist erreicht. Die Zieladresse wurde unterwegs nicht verändert. Gesamtkosten des gewählten Weges: ${pathCost(path)}.`;
+    return;
+  }
+
+  const nextCost = linkCost(current, next);
+  const special = specialDecisionText(current, targetKey);
+
+  if (special) {
+    el.decisionText.textContent = special;
+    return;
+  }
+
+  el.decisionText.textContent = `${currentName} sucht in seiner Routingtabelle das Zielnetz ${target.network}. Die passende Zeile zeigt: nächster Hop ${nextName}, Kosten ab hier ${nextCost}.`;
+}
+
+function specialDecisionText(current, target) {
+  if (current === "r2" && target === "server") {
+    return "R2 könnte scheinbar direkt zum Server senden. Dieser direkte Link kostet aber 8. Der Weg über R4 kostet nur 2 + 1 = 3. Deshalb wird der Umweg über R4 gewählt.";
+  }
+  if (current === "r1" && target === "tablet") {
+    return "R1 könnte scheinbar direkt zum Tablet senden. Dieser direkte Link kostet aber 7. Der Weg über R3 kostet nur 1 + 1 = 2. Deshalb wird der Umweg über R3 gewählt.";
+  }
+  if (current === "r1" && target === "printer") {
+    return "R1 vergleicht zwei sinnvolle Richtungen: oben über R2 kostet der Weg zum Drucker 5, unten über R3 kostet er 3. Deshalb geht das Paket nach unten zu R3.";
+  }
+  return "";
+}
+
+function updateLog(path, target) {
+  el.log.innerHTML = "";
+
+  for (let i = 0; i <= stepIndex; i++) {
+    const current = path[i];
+    const next = path[i + 1];
+    const item = document.createElement("div");
+    item.className = "logItem";
+
+    let title = "";
+    let text = "";
+
+    if (i === 0) {
+      title = "Paket entsteht";
+      text = `Quelle: PC A. Ziel: ${target.name} (${target.address}).`;
+    } else if (!next) {
+      title = `${nodes[current].label} empfängt`;
+      text = `Ziel erreicht. Gesamtkosten: ${pathCost(path)}.`;
+    } else {
+      title = `${nodes[current].label} entscheidet`;
+      text = `Weiter zu ${nodes[next].label}. Kosten bisher: ${totalCostSoFar(path)}.`;
+    }
+
+    item.innerHTML = `<div class="logNum">${i}</div><div><strong>${title}</strong><span>${text}</span></div>`;
+    el.log.appendChild(item);
+  }
+}
+
+function render() {
+  const target = targets[targetKey];
+  const path = target.path;
+  const current = path[stepIndex];
+  const next = path[stepIndex + 1];
+
+  clearHighlights();
+  markRejectedLinks(target);
+  setPacketPosition(current);
+  markPath(path);
+  markNodes(current);
+  updateCompareBox(target);
+  updateTable(current, target);
+  updateDecision(current, next, target, path);
+  updateLog(path, target);
+
+  el.stepBtn.disabled = stepIndex >= path.length - 1;
+  el.autoBtn.disabled = stepIndex >= path.length - 1;
+}
+
+function nextStep() {
+  const path = targets[targetKey].path;
+  if (stepIndex < path.length - 1) {
+    stepIndex++;
+    render();
+  }
+}
+
+function stopAuto() {
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    el.autoBtn.textContent = "Automatisch";
+  }
+}
+
+function reset() {
+  stopAuto();
+  stepIndex = 0;
+  render();
+}
+
+function toggleAuto() {
+  if (autoTimer) {
+    stopAuto();
+    return;
+  }
+  el.autoBtn.textContent = "Stoppen";
+  autoTimer = setInterval(() => {
+    const path = targets[targetKey].path;
+    if (stepIndex >= path.length - 1) {
+      stopAuto();
+      return;
+    }
+    nextStep();
+  }, 1150);
+}
+
+el.targetSelect.addEventListener("change", () => {
+  targetKey = el.targetSelect.value;
+  reset();
+});
+
+el.stepBtn.addEventListener("click", nextStep);
+el.resetBtn.addEventListener("click", reset);
+el.autoBtn.addEventListener("click", toggleAuto);
+
+render();
+</script>
+</body>
+</html>
